@@ -371,16 +371,15 @@ namespace FFmpegVideoLibrary
 			//George Sun
 			// Setup the codec parameters
 			OpenFFmpeg::AVCodec *codec = OpenFFmpeg::avcodec_find_encoder(OpenFFmpeg::CODEC_ID_H264);
-			OpenFFmpeg::AVCodecContext* cctx = NULL;
-			cctx = OpenFFmpeg::avcodec_alloc_context3(codec);
+			OpenFFmpeg::AVCodecContext* cctx = OpenFFmpeg::avcodec_alloc_context3(codec);
 			OpenFFmpeg::AVPacket *pkt;
 
 			cctx->bit_rate = 4000000;
 			cctx->width = pCodecCtx->width;
 			cctx->height = pCodecCtx->height;
-			cctx->time_base.den = 1;
-			cctx->time_base.num = 30;
-			//cctx->time_base = pCodecCtx->time_base;	// copy the time base;
+			//cctx->time_base.den = 30;
+			//cctx->time_base.num = 1;
+			cctx->time_base = pCodecCtx->time_base;	// copy the time base;
 			cctx->gop_size = 15;
 			cctx->max_b_frames = 1;
 			cctx->pix_fmt = OpenFFmpeg::PIX_FMT_YUV422P;	//need to be verified 
@@ -427,7 +426,7 @@ namespace FFmpegVideoLibrary
 
 			//cctx->profile = FF_PROFILE_H264_BASELINE; 
 			OpenFFmpeg::AVDictionary * codec_options(0);
-			OpenFFmpeg::av_dict_set(&codec_options, "preset", "faster", 0);
+			OpenFFmpeg::av_dict_set(&codec_options, "preset", "veryfast", 0);
 			OpenFFmpeg::av_dict_set(&codec_options, "crf", "23", 0);
 			//OpenFFmpeg::av_opt_set(cctx->priv_data, "preset", "veryfast", 0);
 			//OpenFFmpeg::av_opt_set(cctx->priv_data, "crf", "23", 0);
@@ -438,6 +437,7 @@ namespace FFmpegVideoLibrary
 				FireEvent(FFmpegVideoLibrary::CameraLibraryEventType::CameraCriticalError, "Could not open encoder video CODEC");
 				return;
 			}
+			cctx->flags |= CODEC_FLAG_GLOBAL_HEADER;
 
 			//Allocate a frame
 			pFrame = OpenFFmpeg::av_frame_alloc();
@@ -536,9 +536,10 @@ namespace FFmpegVideoLibrary
 									pkt->data = NULL;	//packet data will be allocated by the encoder
 									pkt->size = 0;
 
-									pFrame->pts = packet->pts - offset;
-									pFrame->pts = iDen++;
-									//pFrame->pict_type = OpenFFmpeg::AVPictureType::AV_PICTURE_TYPE_NONE;
+									//pFrame->pts = packet->pts - offset;
+									pFrame->pts = iDen;
+									iDen++;
+									pFrame->pict_type = OpenFFmpeg::AVPictureType::AV_PICTURE_TYPE_NONE;
 									ret = OpenFFmpeg::avcodec_encode_video2(cctx, pkt, pFrame, &got_output);
 									if (ret < 0)
 										FireEvent(FFmpegVideoLibrary::CameraLibraryEventType::StringValue, "Error encoding frame");
@@ -565,6 +566,8 @@ namespace FFmpegVideoLibrary
 										//}
 
 										//pkt->pts = iDen;
+										//System::Diagnostics::Trace::WriteLine("Encoded output pts= " + pkt->pts + " : " + pkt->pts *cctx->time_base.num/cctx->time_base.den + ", dts = " + pkt->dts);
+
 										AddVideoAndAudio2CircularBuffer(pkt, frameTimeStamp);
 									}
 
